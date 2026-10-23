@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#071827">
+<meta name="description" content="윈디 강수 지도와 시간별·주간 날씨 예보를 한곳에서 확인하는 개인용 날씨 앱">
+<link rel="manifest" href="manifest.webmanifest">
+<title>구름날씨 | 레이더 & 예보</title>
+<style>
+:root{--bg:#071827;--panel:#10283a;--panel2:#17354a;--text:#eef7ff;--muted:#9bb5c8;--accent:#61d6c5;--line:#27465b;--rain:#68b7ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#071827,#0b2233 55%,#102d40);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;min-height:100vh}
+.app{max-width:680px;margin:auto;padding:env(safe-area-inset-top) 14px calc(84px + env(safe-area-inset-bottom))}
+header{padding:22px 4px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:850;font-size:23px;letter-spacing:-.7px}.brand span{color:var(--accent)}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+select,button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+select{max-width:145px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 14px}.tab{border-radius:13px;padding:12px;border:1px solid var(--line);background:transparent;color:var(--muted);font-weight:750}.tab.active{background:var(--accent);color:#05242b;border-color:var(--accent)}
+.card{background:rgba(16,40,58,.94);border:1px solid var(--line);border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 12px 30px #00000012}
+.label{font-size:12px;color:var(--muted);letter-spacing:.3px}.current{display:flex;align-items:center;justify-content:space-between;gap:10px}.temp{font-size:56px;line-height:1.1;font-weight:800;letter-spacing:-2px}.condition{font-size:16px;font-weight:700;margin-top:5px}.emoji{font-size:52px}.details{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.detail{background:#0a2030;border-radius:13px;padding:11px 8px;text-align:center}.detail b{display:block;font-size:15px;margin-top:5px}.detail span{font-size:11px;color:var(--muted)}
+.section-title{font-size:17px;font-weight:800;margin:4px 0 12px}.hourly{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}.hour{min-width:66px;background:#0a2030;border-radius:13px;padding:11px 8px;text-align:center}.hour .time{font-size:12px;color:var(--muted)}.hour .ico{font-size:22px;margin:7px 0}.hour b{font-size:14px}.hour small{display:block;color:var(--rain);font-size:11px;margin-top:5px}
+.day{display:grid;grid-template-columns:1.1fr .6fr 1.4fr .7fr;align-items:center;gap:6px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.day:last-child{border-bottom:0}.day .dname{font-weight:700}.day .dico{font-size:19px}.range{color:var(--muted);text-align:right}.rainprob{color:var(--rain);text-align:right}
+.radar-wrap{overflow:hidden;border-radius:15px;background:#081521;min-height:390px;position:relative}.radar-wrap iframe{width:100%;height:430px;border:0;display:block}.radar-note{font-size:12px;line-height:1.5;color:var(--muted);margin-top:10px}
+.pills{display:flex;gap:7px;overflow-x:auto;margin-bottom:10px}.pill{white-space:nowrap;padding:8px 12px;border-radius:999px;font-size:12px}.pill.selected{background:#23566a;border-color:#397e91}
+.notice{color:var(--muted);font-size:12px;line-height:1.6}.status{font-size:12px;color:var(--muted);margin:8px 2px}.error{color:#ffb7a9}.hidden{display:none!important}
+.bottom{position:fixed;bottom:0;left:0;right:0;background:#071827ee;backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:11px 14px calc(11px + env(safe-area-inset-bottom));display:flex;justify-content:center;z-index:4}.bottom button{width:100%;max-width:650px;background:var(--accent);color:#05242b;font-weight:800;border:0}
+footer{text-align:center;color:var(--muted);font-size:11px;padding:14px 0}
+@media(min-width:600px){.app{padding-top:22px}.radar-wrap iframe{height:520px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><div class="brand">☁ 구름<span>날씨</span></div><div class="sub">레이더와 예보를 한 화면에</div></div>
+<select id="city" aria-label="지역 선택">
+<option value="daejeon">대전</option><option value="seoul">서울</option><option value="busan">부산</option><option value="tokyo">도쿄</option><option value="osaka">오사카</option>
+</select></header>
+<div class="tabs"><button class="tab active" data-tab="forecast">오늘·주간 예보</button><button class="tab" data-tab="radar">비구름 레이더</button></div>
+<section id="forecastPanel">
+<div class="card">
+<div class="label" id="todayDate">오늘 날씨</div>
+<div class="current"><div><div class="temp" id="currentTemp">--°</div><div class="condition" id="currentDesc">날씨 정보를 불러오는 중</div><div class="sub" id="feels">체감온도 --°</div></div><div class="emoji" id="currentIcon">🌤️</div></div>
+<div class="details">
+<div class="detail"><span>강수확률</span><b id="currentRain">--%</b></div><div class="detail"><span>풍속</span><b id="currentWind">-- km/h</b></div><div class="detail"><span>습도</span><b id="currentHumidity">--%</b></div>
+</div><div class="status" id="updated">예보 데이터를 연결하고 있습니다…</div>
+</div>
+<div class="card"><div class="section-title">시간별 예보 <span class="label">다음 24시간</span></div><div class="hourly" id="hourly"><div class="status">불러오는 중…</div></div></div>
+<div class="card"><div class="section-title">7일 예보</div><div id="daily"><div class="status">불러오는 중…</div></div></div>
+<div class="notice">예보 데이터: Open-Meteo · 무료 개인·비상업 이용 기준. 실제 날씨와 차이가 있을 수 있습니다.</div>
+</section>
+<section id="radarPanel" class="hidden">
+<div class="card">
+<div class="section-title">🌧️ 강수·구름 지도</div>
+<div class="pills"><button class="pill selected" data-layer="rain">비·강수</button><button class="pill" data-layer="clouds">구름</button><button class="pill" data-layer="wind">바람</button><button class="pill" data-layer="temp">기온</button></div>
+<div class="radar-wrap"><iframe id="windyFrame" title="Windy weather map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>
+<div class="radar-note">지도는 Windy의 삽입형 지도를 표시합니다. 지도를 움직이거나 확대해 주변 지역을 확인할 수 있습니다. 표시 가능한 레이어와 예보 시간은 Windy 서비스 설정에 따라 달라질 수 있습니다.</div>
+</div>
+</section>
+<footer>개인용 날씨 도구 · <a href="https://open-meteo.com/" style="color:#9bb5c8">Weather data by Open-Meteo</a> · <a href="https://www.windy.com/" style="color:#9bb5c8">Windy</a></footer>
+</div>
+<div class="bottom"><button id="refresh">↻ 날씨 새로고침</button></div>
+<script>
+const cities={
+ daejeon:{name:"대전",lat:36.3504,lon:127.3845,tz:"Asia/Seoul"},
+ seoul:{name:"서울",lat:37.5665,lon:126.9780,tz:"Asia/Seoul"},
+ busan:{name:"부산",lat:35.1796,lon:129.0756,tz:"Asia/Seoul"},
+ tokyo:{name:"도쿄",lat:35.6762,lon:139.6503,tz:"Asia/Tokyo"},
+ osaka:{name:"오사카",lat:34.6937,lon:135.5023,tz:"Asia/Tokyo"}
+};
+let activeCity="daejeon",activeLayer="rain";
+const $=id=>document.getElementById(id);
+const weatherCodes={0:["맑음","☀️"],1:["대체로 맑음","🌤️"],2:["구름 조금","⛅"],3:["흐림","☁️"],45:["안개","🌫️"],48:["짙은 안개","🌫️"],51:["약한 이슬비","🌦️"],53:["이슬비","🌦️"],55:["강한 이슬비","🌧️"],56:["어는 이슬비","🌧️"],57:["강한 어는 이슬비","🌧️"],61:["약한 비","🌦️"],63:["비","🌧️"],65:["강한 비","🌧️"],66:["어는 비","🌧️"],67:["강한 어는 비","🌧️"],71:["약한 눈","🌨️"],73:["눈","🌨️"],75:["강한 눈","❄️"],77:["싸락눈","🌨️"],80:["소나기","🌦️"],81:["강한 소나기","🌧️"],82:["매우 강한 소나기","⛈️"],85:["눈 소나기","🌨️"],86:["강한 눈 소나기","❄️"],95:["뇌우","⛈️"],96:["우박 동반 뇌우","⛈️"],99:["강한 뇌우","⛈️"]};
+function codeInfo(c){return weatherCodes[c]||["날씨 정보","🌡️"]}
+function windyUrl(){const c=cities[activeCity];return `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=6&overlay=${activeLayer}&product=ecmwf&level=surface&lat=${c.lat}&lon=${c.lon}&detailLat=${c.lat}&detailLon=${c.lon}&marker=true`}
+function updateMap(){ $("windyFrame").src=windyUrl(); }
+function fmtTime(s){return s.slice(11,16)}
+function fmtDate(s){const d=new Date(s+"T12:00:00");return `${d.getMonth()+1}/${d.getDate()} (${["일","월","화","수","목","금","토"][d.getDay()]})`}
+function dayName(s,i){if(i===0)return "오늘";if(i===1)return "내일";const d=new Date(s+"T12:00:00");return ["일","월","화","수","목","금","토"][d.getDay()]+"요일"}
+async function loadWeather(){
+ const c=cities[activeCity]; $("todayDate").textContent=`${c.name} · ${new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})}`;
+ $("updated").textContent="예보 데이터를 불러오는 중…";$("updated").classList.remove("error");
+ const url=`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=7&timezone=${encodeURIComponent(c.tz)}`;
+ try{
+  const r=await fetch(url);if(!r.ok)throw new Error("날씨 서버 응답 오류");const d=await r.json();const cur=d.current,info=codeInfo(cur.weather_code);
+  $("currentTemp").textContent=Math.round(cur.temperature_2m)+"°";$("currentDesc").textContent=info[0];$("currentIcon").textContent=info[1];$("feels").textContent=`체감온도 ${Math.round(cur.apparent_temperature)}°`;
+  const idx=d.hourly.time.findIndex(t=>t.slice(0,13)===cur.time.slice(0,13));const hi=Math.max(0,idx);
+  $("currentRain").textContent=(d.hourly.precipitation_probability[hi]??0)+"%";$("currentWind").textContent=Math.round(cur.wind_speed_10m)+" km/h";$("currentHumidity").textContent=cur.relative_humidity_2m+"%";
+  $("updated").textContent=`현재 관측·예보 기준 ${cur.time.replace("T"," ")} · ${c.name}`;
+  let hs="";for(let i=hi;i<Math.min(hi+24,d.hourly.time.length);i++){const inf=codeInfo(d.hourly.weather_code[i]);hs+=`<div class="hour"><div class="time">${i===hi?"지금":fmtTime(d.hourly.time[i])}</div><div class="ico">${inf[1]}</div><b>${Math.round(d.hourly.temperature_2m[i])}°</b><small>☂ ${d.hourly.precipitation_probability[i]??0}%</small></div>`}
+  $("hourly").innerHTML=hs||"시간별 자료가 없습니다.";
+  let ds="";for(let i=0;i<d.daily.time.length;i++){const inf=codeInfo(d.daily.weather_code[i]);ds+=`<div class="day"><div class="dname">${dayName(d.daily.time[i],i)}<div class="label">${fmtDate(d.daily.time[i])}</div></div><div class="dico">${inf[1]}</div><div>${inf[0]}<div class="label">강수확률 ${d.daily.precipitation_probability_max[i]??0}%</div></div><div class="range">${Math.round(d.daily.temperature_2m_max[i])}° / ${Math.round(d.daily.temperature_2m_min[i])}°</div></div>`}
+  $("daily").innerHTML=ds;
+ }catch(e){$("updated").textContent="날씨 정보를 불러오지 못했습니다. 인터넷 연결 후 새로고침해 주세요."; $("updated").classList.add("error");$("hourly").innerHTML="데이터 연결 실패";$("daily").innerHTML="데이터 연결 실패"}
+}
+document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));const radar=b.dataset.tab==="radar";$("radarPanel").classList.toggle("hidden",!radar);$("forecastPanel").classList.toggle("hidden",radar);if(radar&&!$("windyFrame").src)updateMap()}));
+document.querySelectorAll("[data-layer]").forEach(b=>b.addEventListener("click",()=>{activeLayer=b.dataset.layer;document.querySelectorAll("[data-layer]").forEach(x=>x.classList.toggle("selected",x===b));updateMap()}));
+$("city").addEventListener("change",e=>{activeCity=e.target.value;loadWeather();updateMap()});
+$("refresh").addEventListener("click",()=>{loadWeather();if(!$("radarPanel").classList.contains("hidden"))updateMap()});
+if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(()=>{});
+loadWeather();updateMap();
+</script>
+</body></html>
