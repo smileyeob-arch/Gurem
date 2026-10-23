@@ -30,9 +30,12 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:14px 0}
 <body>
 <div class="app">
 <header><div><div class="brand">☁ 구름<span>날씨</span></div><div class="sub">레이더와 예보를 한 화면에</div></div>
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
 <select id="city" aria-label="지역 선택">
 <option value="daejeon">대전</option><option value="seoul">서울</option><option value="busan">부산</option><option value="tokyo">도쿄</option><option value="osaka">오사카</option>
-</select></header>
+</select>
+<button id="locate" type="button" style="font-size:12px;padding:7px 10px">◎ 내 위치 사용</button>
+</div></header>
 <div class="tabs"><button class="tab active" data-tab="forecast">오늘·주간 예보</button><button class="tab" data-tab="radar">비구름 레이더</button></div>
 <section id="forecastPanel">
 <div class="card">
@@ -66,16 +69,35 @@ const cities={
  osaka:{name:"오사카",lat:34.6937,lon:135.5023,tz:"Asia/Tokyo"}
 };
 let activeCity="daejeon",activeLayer="rain";
+let currentLocation=null;
 const $=id=>document.getElementById(id);
+function activePlace(){
+ if(currentLocation) return {name:"내 현재 위치",lat:currentLocation.lat,lon:currentLocation.lon,tz:Intl.DateTimeFormat().resolvedOptions().timeZone||"Asia/Seoul"};
+ return cities[activeCity];
+}
+function useCurrentLocation(){
+ const btn=$("locate");
+ if(!("geolocation" in navigator)){alert("이 브라우저에서는 위치 기능을 사용할 수 없습니다.");return;}
+ btn.disabled=true;btn.textContent="위치 확인 중…";
+ navigator.geolocation.getCurrentPosition(pos=>{
+   currentLocation={lat:pos.coords.latitude,lon:pos.coords.longitude};
+   btn.disabled=false;btn.textContent="◎ 내 위치 갱신";
+   loadWeather();updateMap();
+ },err=>{
+   btn.disabled=false;btn.textContent="◎ 내 위치 사용";
+   const msg=err.code===1?"위치 권한이 거부되었습니다. Chrome 사이트 설정에서 위치 권한을 허용해 주세요.":err.code===2?"현재 위치를 확인하지 못했습니다. GPS를 켜고 다시 시도해 주세요.":"위치 확인 시간이 초과되었습니다. 다시 시도해 주세요.";
+   alert(msg);
+ },{enableHighAccuracy:true,timeout:15000,maximumAge:120000});
+}
 const weatherCodes={0:["맑음","☀️"],1:["대체로 맑음","🌤️"],2:["구름 조금","⛅"],3:["흐림","☁️"],45:["안개","🌫️"],48:["짙은 안개","🌫️"],51:["약한 이슬비","🌦️"],53:["이슬비","🌦️"],55:["강한 이슬비","🌧️"],56:["어는 이슬비","🌧️"],57:["강한 어는 이슬비","🌧️"],61:["약한 비","🌦️"],63:["비","🌧️"],65:["강한 비","🌧️"],66:["어는 비","🌧️"],67:["강한 어는 비","🌧️"],71:["약한 눈","🌨️"],73:["눈","🌨️"],75:["강한 눈","❄️"],77:["싸락눈","🌨️"],80:["소나기","🌦️"],81:["강한 소나기","🌧️"],82:["매우 강한 소나기","⛈️"],85:["눈 소나기","🌨️"],86:["강한 눈 소나기","❄️"],95:["뇌우","⛈️"],96:["우박 동반 뇌우","⛈️"],99:["강한 뇌우","⛈️"]};
 function codeInfo(c){return weatherCodes[c]||["날씨 정보","🌡️"]}
-function windyUrl(){const c=cities[activeCity];return `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=6&overlay=${activeLayer}&product=ecmwf&level=surface&lat=${c.lat}&lon=${c.lon}&detailLat=${c.lat}&detailLon=${c.lon}&marker=true`}
+function windyUrl(){const c=activePlace();return `https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=6&overlay=${activeLayer}&product=ecmwf&level=surface&lat=${c.lat}&lon=${c.lon}&detailLat=${c.lat}&detailLon=${c.lon}&marker=true`}
 function updateMap(){ $("windyFrame").src=windyUrl(); }
 function fmtTime(s){return s.slice(11,16)}
 function fmtDate(s){const d=new Date(s+"T12:00:00");return `${d.getMonth()+1}/${d.getDate()} (${["일","월","화","수","목","금","토"][d.getDay()]})`}
 function dayName(s,i){if(i===0)return "오늘";if(i===1)return "내일";const d=new Date(s+"T12:00:00");return ["일","월","화","수","목","금","토"][d.getDay()]+"요일"}
 async function loadWeather(){
- const c=cities[activeCity]; $("todayDate").textContent=`${c.name} · ${new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})}`;
+ const c=activePlace(); $("todayDate").textContent=`${c.name} · ${new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})}`;
  $("updated").textContent="예보 데이터를 불러오는 중…";$("updated").classList.remove("error");
  const url=`https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&forecast_days=7&timezone=${encodeURIComponent(c.tz)}`;
  try{
@@ -92,7 +114,8 @@ async function loadWeather(){
 }
 document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));const radar=b.dataset.tab==="radar";$("radarPanel").classList.toggle("hidden",!radar);$("forecastPanel").classList.toggle("hidden",radar);if(radar&&!$("windyFrame").src)updateMap()}));
 document.querySelectorAll("[data-layer]").forEach(b=>b.addEventListener("click",()=>{activeLayer=b.dataset.layer;document.querySelectorAll("[data-layer]").forEach(x=>x.classList.toggle("selected",x===b));updateMap()}));
-$("city").addEventListener("change",e=>{activeCity=e.target.value;loadWeather();updateMap()});
+$("city").addEventListener("change",e=>{activeCity=e.target.value;currentLocation=null;$("locate").textContent="◎ 내 위치 사용";loadWeather();updateMap()});
+$("locate").addEventListener("click",useCurrentLocation);
 $("refresh").addEventListener("click",()=>{loadWeather();if(!$("radarPanel").classList.contains("hidden"))updateMap()});
 if("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("./sw.js").catch(()=>{});
 loadWeather();updateMap();
